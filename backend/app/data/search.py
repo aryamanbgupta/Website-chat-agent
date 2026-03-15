@@ -5,7 +5,11 @@ import re
 from app.config import DEFAULT_MAX_RESULTS, KEYWORD_FALLBACK_MAX
 from app.data import loader
 from app.data.chroma_store import query_knowledge, query_parts
-from app.data.embeddings import embed_query
+from app.data.embeddings import embed_query, embed_texts
+
+# Cached repair embeddings for semantic symptom matching
+_repair_embeddings: list[list[float]] = []
+_repair_texts: list[str] = []
 
 PS_PATTERN = re.compile(r"PS\d{5,10}", re.IGNORECASE)
 MODEL_PATTERN = re.compile(r"[A-Z]{2,5}\d{3,}[A-Z\d]*", re.IGNORECASE)
@@ -213,3 +217,118 @@ def _reciprocal_rank_fusion(
 
     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     return [part_map[ps] for ps, _score in ranked]
+
+
+# ---------------------------------------------------------------------------
+# Embedding-based repair guide search
+# ---------------------------------------------------------------------------
+
+def _build_repair_embeddings() -> None:
+    """Batch-embed all repair guides and cache the results.
+
+    Gemini limits batch embedding to 100 texts, so we chunk accordingly.
+    """
+    global _repair_embeddings, _repair_texts
+    texts = []
+    for repair in loader.all_repairs:
+        symptom = repair.get("symptom", "")
+        title = repair.get("title", "")
+        action = repair.get("action", "")
+        text = f"{symptom} {title} {action}".strip()
+        texts.append(text)
+    _repair_texts = texts
+
+    # Batch in chunks of 100 (Gemini API limit)
+    all_embeddings: list[list[float]] = []
+    batch_size = 100
+    for start in range(0, len(texts), batch_size):
+        batch = texts[start : start + batch_size]
+        all_embeddings.extend(embed_texts(batch))
+    _repair_embeddings = all_embeddings
+
+
+def _dot_product(a: list[float], b: list[float]) -> float:
+    return sum(x * y for x, y in zip(a, b))
+
+
+def search_repairs(
+    query: str,
+    appliance_type: str | None = None,
+    top_k: int = 1,
+) -> list[dict]:
+    """Find repair guides matching a symptom query using embeddings.
+
+    Falls back to word-overlap scoring if embedding fails.
+    Returns a list of raw repair guide dicts from loader.all_repairs.
+    """
+    # Lazy-init: build embeddings on first call
+    if not _repair_embeddings:
+        try:
+            _build_repair_embeddings()
+        except Exception:
+            return _search_repairs_fallback(query, appliance_type, top_k)
+
+    # Embed the query
+    try:
+        query_embedding = embed_query(query)
+    except Exception:
+        return _search_repairs_fallback(query, appliance_type, top_k)
+
+    # Score each repair guide by cosine similarity (vectors are unit-normalized)
+    scored: list[tuple[float, dict]] = []
+    for i, repair in enumerate(loader.all_repairs):
+        if appliance_type and repair.get("appliance_type", "") != appliance_type:
+            continue
+        sim = _dot_product(query_embedding, _repair_embeddings[i])
+        scored.append((sim, repair))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [repair for _, repair in scored[:top_k]]
+
+
+def _search_repairs_fallback(
+    query: str,
+    appliance_type: str | None,
+    top_k: int,
+) -> list[dict]:
+    """Word-overlap fallback when embeddings are unavailable."""
+    query_lower = query.lower().strip()
+    query_words = set(query_lower.split())
+    scored: list[tuple[int, dict]] = []
+
+    for repair in loader.all_repairs:
+        if appliance_type and repair.get("appliance_type", "") != appliance_type:
+            continue
+
+        repair_symptom = repair.get("symptom", "").lower()
+
+        # Exact match — return immediately
+        if query_lower == repair_symptom:
+            return [repair]
+
+        # Word overlap across symptom, title, action
+        symptom_words = set(repair_symptom.split())
+        overlap = len(query_words & symptom_words)
+        if query_lower in repair_symptom or repair_symptom in query_lower:
+            overlap += 2
+
+        title_lower = repair.get("title", "").lower()
+        title_words = set(title_lower.split()) - {"how", "to", "fix", "a", "the"}
+        title_overlap = len(query_words & title_words)
+        if query_lower in title_lower:
+            title_overlap += 2
+
+        action_lower = repair.get("action", "").lower()
+        action_overlap = 0
+        if action_lower:
+            action_words = set(action_lower.split())
+            action_overlap = len(query_words & action_words)
+            if query_lower in action_lower or action_lower in query_lower:
+                action_overlap += 2
+
+        best_score = max(overlap, title_overlap, action_overlap)
+        if best_score >= 1:
+            scored.append((best_score, repair))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [repair for _, repair in scored[:top_k]]

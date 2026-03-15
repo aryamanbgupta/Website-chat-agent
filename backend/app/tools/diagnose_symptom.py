@@ -1,7 +1,7 @@
 """diagnose_symptom tool — symptom matching + cause-to-part linking."""
 
 from app.data import loader
-from app.data.search import search_knowledge
+from app.data.search import search_knowledge, search_repairs
 
 
 def diagnose_symptom(
@@ -164,61 +164,14 @@ def _match_symptom(symptom: str, appliance_type: str) -> tuple[str, list[str]]:
 def _get_repair_causes(symptom: str, appliance_type: str) -> list[dict]:
     """Find repair guide causes matching the symptom.
 
-    Searches all 149+ repair guides (generic, brand-specific, how-to).
-    For brand-specific guides, also checks the title field since the symptom
-    field may contain the brand name instead of the actual symptom.
+    Uses embedding-based search (with word-overlap fallback) to find the
+    best-matching repair guide, then extracts structured causes from it.
     """
-    symptom_lower = symptom.lower().strip()
-    best_match = None
-    best_score = 0
-
-    for repair in loader.all_repairs:
-        if repair.get("appliance_type", "") != appliance_type:
-            continue
-
-        repair_symptom = repair.get("symptom", "").lower()
-
-        # For brand-specific/howto guides, also match against title and action
-        title_lower = repair.get("title", "").lower()
-        action_lower = repair.get("action", "").lower()
-
-        # Exact match on symptom
-        if symptom_lower == repair_symptom:
-            best_match = repair
-            best_score = 999
-            break
-
-        # Word overlap scoring across symptom, title, and action fields
-        symptom_words = set(symptom_lower.split())
-
-        # Score against symptom field
-        repair_words = set(repair_symptom.split())
-        overlap = len(symptom_words & repair_words)
-        if symptom_lower in repair_symptom or repair_symptom in symptom_lower:
-            overlap += 2
-
-        # Score against title field (brand-specific guides)
-        title_words = set(title_lower.split()) - {"how", "to", "fix", "a", "the"}
-        title_overlap = len(symptom_words & title_words)
-        if symptom_lower in title_lower:
-            title_overlap += 2
-
-        # Score against action field (howto guides)
-        action_overlap = 0
-        if action_lower:
-            action_words = set(action_lower.split())
-            action_overlap = len(symptom_words & action_words)
-            if symptom_lower in action_lower or action_lower in symptom_lower:
-                action_overlap += 2
-
-        best_field_score = max(overlap, title_overlap, action_overlap)
-
-        if best_field_score > best_score:
-            best_score = best_field_score
-            best_match = repair
-
-    if not best_match or best_score < 1:
+    matches = search_repairs(symptom, appliance_type=appliance_type, top_k=1)
+    if not matches:
         return []
+
+    best_match = matches[0]
 
     causes = []
     for sc in best_match.get("structured_causes", []):

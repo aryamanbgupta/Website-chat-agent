@@ -111,9 +111,21 @@ export function useChat() {
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
 
+  // Buffer card blocks during streaming so they only appear after text is done
+  const pendingBlocksRef = useRef<ContentBlock[]>([]);
+
+  const flushPendingBlocks = useCallback(() => {
+    for (const block of pendingBlocksRef.current) {
+      dispatchRef.current({ type: "ADD_CONTENT_BLOCK", block });
+    }
+    pendingBlocksRef.current = [];
+  }, []);
+
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || !sessionId) return;
+
+      pendingBlocksRef.current = [];
 
       const userMsg: Message = {
         id: generateId(),
@@ -138,39 +150,45 @@ export function useChat() {
         await send(API_PATHS.chat, { message: text.trim(), session_id: sessionId }, {
           onTextDelta: (t) => dispatchRef.current({ type: "APPEND_TEXT_DELTA", text: t }),
           onProductCard: (data) =>
-            dispatchRef.current({
-              type: "ADD_CONTENT_BLOCK",
-              block: { type: "product_card", data: data as ProductCardData },
+            pendingBlocksRef.current.push({
+              type: "product_card",
+              data: data as ProductCardData,
             }),
           onCompatibilityResult: (data) =>
-            dispatchRef.current({
-              type: "ADD_CONTENT_BLOCK",
-              block: { type: "compatibility_result", data: data as CompatibilityResultData },
+            pendingBlocksRef.current.push({
+              type: "compatibility_result",
+              data: data as CompatibilityResultData,
             }),
           onDiagnosis: (data) =>
-            dispatchRef.current({
-              type: "ADD_CONTENT_BLOCK",
-              block: { type: "diagnosis", data: data as DiagnosisData },
+            pendingBlocksRef.current.push({
+              type: "diagnosis",
+              data: data as DiagnosisData,
             }),
           onStatus: (t) => dispatchRef.current({ type: "SET_STATUS", text: t }),
           onSuggestions: (opts) => dispatchRef.current({ type: "SET_SUGGESTIONS", options: opts }),
           onError: (e) => dispatchRef.current({ type: "SET_ERROR", error: e }),
-          onDone: () => dispatchRef.current({ type: "FINALIZE_STREAM" }),
+          onDone: () => {
+            flushPendingBlocks();
+            dispatchRef.current({ type: "FINALIZE_STREAM" });
+          },
         });
       } catch {
+        flushPendingBlocks();
         dispatchRef.current({ type: "FINALIZE_STREAM" });
       }
     },
-    [sessionId, send]
+    [sessionId, send, flushPendingBlocks]
   );
 
   const stopStreaming = useCallback(() => {
     abort();
+    flushPendingBlocks();
     dispatch({ type: "FINALIZE_STREAM" });
-  }, [abort]);
+  }, [abort, flushPendingBlocks]);
 
   const clearMessages = useCallback(() => {
     abort();
+    pendingBlocksRef.current = [];
     dispatch({ type: "CLEAR_MESSAGES" });
     resetSession();
   }, [abort, resetSession]);

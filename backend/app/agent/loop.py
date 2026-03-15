@@ -1,5 +1,6 @@
 """The while-loop agent orchestrator — LLM decides tools, we execute them."""
 
+import asyncio
 import json
 from collections.abc import AsyncGenerator
 
@@ -12,6 +13,7 @@ from app.config import GEMINI_API_KEY, GEMINI_MODEL, MAX_AGENT_ITERATIONS
 from app.tools.registry import execute_tool, get_tool_declarations
 
 _client = None
+_STREAM_DONE = object()
 
 
 def _get_client():
@@ -66,7 +68,9 @@ async def run_agent(
         iterations += 1
 
         try:
-            response = _get_client().models.generate_content(
+            # Start streaming response in a thread (sync SDK call)
+            stream = await asyncio.to_thread(
+                _get_client().models.generate_content_stream,
                 model=GEMINI_MODEL,
                 contents=gemini_contents,
                 config=types.GenerateContentConfig(
@@ -80,37 +84,53 @@ async def run_agent(
             yield {"event": "done", "data": ""}
             return
 
-        # Check for tool calls
-        has_tool_calls = False
-        if response.candidates and response.candidates[0].content:
-            for part in response.candidates[0].content.parts:
-                if part.function_call:
-                    has_tool_calls = True
-                    break
+        # Iterate the sync stream chunk-by-chunk via run_in_executor
+        # to avoid blocking the event loop while still streaming text to the client
+        text_parts = []
+        function_calls = []
+        loop = asyncio.get_running_loop()
+        iterator = iter(stream)
 
-        if not has_tool_calls:
-            # Text response — extract and yield
-            text = ""
-            if response.candidates and response.candidates[0].content:
-                for part in response.candidates[0].content.parts:
-                    if part.text:
-                        text += part.text
+        while True:
+            try:
+                chunk = await loop.run_in_executor(
+                    None, next, iterator, _STREAM_DONE
+                )
+            except Exception as e:
+                yield {"event": "error", "data": f"Stream error: {str(e)}"}
+                yield {"event": "done", "data": ""}
+                return
 
-            if text:
-                yield {"event": "text_delta", "data": text}
+            if chunk is _STREAM_DONE:
+                break
 
+            if not (chunk.candidates and chunk.candidates[0].content):
+                continue
+
+            for part in chunk.candidates[0].content.parts:
+                if part.text:
+                    text_parts.append(part.text)
+                    yield {"event": "text_delta", "data": part.text}
+                elif part.function_call:
+                    function_calls.append(part.function_call)
+
+        # If no tool calls, we're done
+        if not function_calls:
             yield {"event": "done", "data": ""}
             return
 
+        # Build the model's response content for conversation history
+        history_parts = []
+        if text_parts:
+            history_parts.append(types.Part(text="".join(text_parts)))
+        for fc in function_calls:
+            history_parts.append(types.Part(function_call=fc))
+
         # Process tool calls
         tool_results = []
-        for part in response.candidates[0].content.parts:
-            if not part.function_call:
-                continue
-
-            call = part.function_call
-            tool_name = call.name
-            tool_args = dict(call.args) if call.args else {}
+        for fc in function_calls:
+            tool_name = fc.name
+            tool_args = dict(fc.args) if fc.args else {}
 
             yield {"event": "status", "data": f"Running {tool_name}..."}
 
@@ -127,7 +147,10 @@ async def run_agent(
             )))
 
         # Append assistant message (with tool calls) + tool results to conversation
-        gemini_contents.append(response.candidates[0].content)
+        gemini_contents.append(types.Content(
+            role="model",
+            parts=history_parts,
+        ))
         gemini_contents.append(types.Content(
             role="user",
             parts=tool_results,

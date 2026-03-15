@@ -1,6 +1,7 @@
 """get_installation_guide tool — installation info and repair guide lookup."""
 
 from app.data import loader
+from app.data.search import search_repairs
 
 
 def get_installation_guide(
@@ -77,55 +78,13 @@ def get_installation_guide(
 def _find_repair_guide(symptom: str, appliance_type: str | None) -> dict | None:
     """Find a repair guide matching the symptom.
 
-    Searches all 149 guides (22 generic + 91 brand-specific + 36 how-to).
-    For how-to guides, also matches against the action and title fields.
+    Uses embedding-based search (with word-overlap fallback) to find the
+    best-matching repair guide from all 149 guides.
     """
-    symptom_lower = symptom.lower().strip()
-    best_match = None
-    best_score = 0
-
-    for repair in loader.all_repairs:
-        if appliance_type and repair.get("appliance_type", "") != appliance_type:
-            continue
-
-        repair_symptom = repair.get("symptom", "").lower()
-
-        # Exact match on symptom
-        if symptom_lower == repair_symptom:
-            return _format_repair_guide(repair)
-
-        # Word overlap scoring across symptom, title, and action fields
-        symptom_words = set(symptom_lower.split())
-
-        repair_words = set(repair_symptom.split())
-        overlap = len(symptom_words & repair_words)
-
-        # Also check title (brand-specific guides)
-        title_lower = repair.get("title", "").lower()
-        title_words = set(title_lower.split()) - {"how", "to", "fix", "a", "the"}
-        title_overlap = len(symptom_words & title_words)
-        if symptom_lower in title_lower:
-            title_overlap += 2
-
-        # Also check action field (howto guides)
-        action_lower = repair.get("action", "").lower()
-        action_overlap = 0
-        if action_lower:
-            action_words = set(action_lower.split())
-            action_overlap = len(symptom_words & action_words)
-            if symptom_lower in action_lower or action_lower in symptom_lower:
-                action_overlap += 2
-
-        best_field_score = max(overlap, title_overlap, action_overlap)
-
-        if best_field_score > best_score:
-            best_score = best_field_score
-            best_match = repair
-
-    if best_match and best_score >= 1:
-        return _format_repair_guide(best_match)
-
-    return None
+    matches = search_repairs(symptom, appliance_type=appliance_type, top_k=1)
+    if not matches:
+        return None
+    return _format_repair_guide(matches[0])
 
 
 def _format_repair_guide(repair: dict) -> dict:
