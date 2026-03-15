@@ -61,7 +61,8 @@ def get_tool_declarations() -> list[types.Tool]:
                 description=(
                     "Check if a specific part is compatible with a specific appliance model number. "
                     "Use this when the user asks 'is X compatible with Y' or 'does X work with Y'. "
-                    "Returns verified/not_in_data (never says 'incompatible' since we have partial model coverage)."
+                    "Returns compatible (True/False) with confidence 'verified' when both part and model are in our database, "
+                    "or 'not_in_data' when the model is unknown."
                 ),
                 parameters=types.Schema(
                     type="OBJECT",

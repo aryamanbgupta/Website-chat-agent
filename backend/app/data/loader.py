@@ -18,7 +18,7 @@ models_index: dict[str, list[str]] = {}
 symptoms_index: dict[str, list[str]] = {}
 repairs: list[dict] = []          # 22 generic guides (backward compat)
 repairs_all: dict = {}            # raw 3-key dict from repairs_all.json
-all_repairs: list[dict] = []      # flattened 149+ guides (filtered)
+all_repairs: list[dict] = []      # flattened from 159 guides, ~149 after filtering "Page Not Found"
 blogs: list[dict] = []
 
 # Derived indexes — built by load_all()

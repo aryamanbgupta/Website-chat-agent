@@ -77,7 +77,7 @@ def get_installation_guide(
 def _find_repair_guide(symptom: str, appliance_type: str | None) -> dict | None:
     """Find a repair guide matching the symptom.
 
-    Searches all 149+ guides including brand-specific and how-to guides.
+    Searches all 149 guides (22 generic + 91 brand-specific + 36 how-to).
     For how-to guides, also matches against the action and title fields.
     """
     symptom_lower = symptom.lower().strip()

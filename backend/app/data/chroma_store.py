@@ -17,7 +17,7 @@ def get_client() -> chromadb.PersistentClient:
 
 
 def get_parts_collection() -> chromadb.Collection:
-    """Get or create the parts collection (4,170 vectors)."""
+    """Get or create the parts collection (4,170 parts with expanded model compatibility)."""
     return get_client().get_or_create_collection(
         name="parts",
         metadata={"hnsw:space": "cosine"},
@@ -25,7 +25,7 @@ def get_parts_collection() -> chromadb.Collection:
 
 
 def get_knowledge_collection() -> chromadb.Collection:
-    """Get or create the knowledge collection (~250 vectors from guides + blogs)."""
+    """Get or create the knowledge collection (~937 vectors from 149 repair guides + 51 blogs)."""
     return get_client().get_or_create_collection(
         name="knowledge",
         metadata={"hnsw:space": "cosine"},

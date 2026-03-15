@@ -198,18 +198,45 @@ def test_search_parts_by_ps_number():
         "Expected PS11752778 in results"
 
 
-def test_check_compatibility():
-    """check_compatibility should return a result (verified or not_in_data)."""
+def test_compatibility_verified_compatible():
+    """Known compatible pair should return compatible=True."""
+    from app.tools.check_compatibility import check_compatibility
+
+    # PS10065979 is a dishwasher part listed under model WDT780SAEM1
+    result = check_compatibility(
+        reasoning="test",
+        part_number="PS10065979",
+        model_number="WDT780SAEM1",
+    )
+    assert result["compatible"] is True, f"Expected compatible=True, got {result['compatible']}"
+    assert result["confidence"] == "verified", f"Expected verified, got {result['confidence']}"
+
+
+def test_compatibility_verified_incompatible():
+    """Fridge part + dishwasher model should return compatible=False."""
+    from app.tools.check_compatibility import check_compatibility
+
+    # PS11752778 is a refrigerator part, WDT780SAEM1 is a dishwasher model
+    result = check_compatibility(
+        reasoning="test",
+        part_number="PS11752778",
+        model_number="WDT780SAEM1",
+    )
+    assert result["compatible"] is False, f"Expected compatible=False, got {result['compatible']}"
+    assert result["confidence"] == "verified", f"Expected verified, got {result['confidence']}"
+
+
+def test_compatibility_unknown_model():
+    """Unknown model number should return compatible=None, not_in_data."""
     from app.tools.check_compatibility import check_compatibility
 
     result = check_compatibility(
         reasoning="test",
         part_number="PS11752778",
-        model_number="WRS321SDHZ08",
+        model_number="FAKE12345XYZ",
     )
-    assert "compatible" in result, "Expected 'compatible' key in result"
-    assert result["confidence"] in ("verified", "not_in_data"), \
-        f"Unexpected confidence: {result['confidence']}"
+    assert result["compatible"] is None, f"Expected compatible=None, got {result['compatible']}"
+    assert result["confidence"] == "not_in_data", f"Expected not_in_data, got {result['confidence']}"
 
 
 def test_product_details():
@@ -259,7 +286,9 @@ def main():
         ("Install: brand-specific symptom", test_installation_symptom_brand_specific),
         # Search & compatibility
         ("Search: PS number lookup", test_search_parts_by_ps_number),
-        ("Compat: check compatibility", test_check_compatibility),
+        ("Compat: verified compatible", test_compatibility_verified_compatible),
+        ("Compat: verified incompatible", test_compatibility_verified_incompatible),
+        ("Compat: unknown model", test_compatibility_unknown_model),
         ("Details: product details", test_product_details),
         # App
         ("App: imports cleanly", test_app_imports),

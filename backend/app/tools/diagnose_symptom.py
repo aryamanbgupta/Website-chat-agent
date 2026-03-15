@@ -12,7 +12,7 @@ def diagnose_symptom(
 ) -> dict:
     """Diagnose an appliance symptom and recommend parts.
 
-    - Fuzzy-matches symptom against 48 keys in symptoms_index
+    - Fuzzy-matches symptom against 49 keys in symptoms_index
     - Looks up structured causes from repair guides
     - Searches knowledge collection for relevant blog content
     - Links cause names to purchasable parts
