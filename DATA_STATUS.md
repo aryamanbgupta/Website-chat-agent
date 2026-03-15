@@ -2,15 +2,15 @@
 
 **Last updated:** 2026-03-14
 **Scraper:** `scrape_partselect.py`
-**Firecrawl credits remaining:** 324 of 500 (free tier)
+**Firecrawl credits remaining:** 270 of 500 (free tier)
 
 ---
 
 ## Executive Summary
 
-We scraped **101 product pages** and **20 repair guide pages** from PartSelect.com using Firecrawl, enhancing a baseline of **4,170 parts** loaded from a reference CSV. The result is a hybrid dataset: 101 parts with full data (compatible models, ratings, descriptions, images, raw markdown for RAG) and 4,069 parts with baseline data only (name, price, brand, stock status).
+We scraped **101 product pages**, **20 repair guide pages**, and **51 blog posts** from PartSelect.com using Firecrawl, enhancing a baseline of **4,170 parts** loaded from a reference CSV. The result is a hybrid dataset: 101 parts with full data (compatible models, ratings, descriptions, images, raw markdown for RAG), 4,069 parts with baseline data only, 10 fully enhanced repair guides, and 51 blog articles covering error codes, troubleshooting, how-tos, and maintenance.
 
-**The 101 enhanced parts are the ones to build the agent system against.** They have everything needed for all 5 tools. The remaining 4,069 parts can be enhanced later by re-running the scraper with more Firecrawl credits or from a machine with a non-blocked IP.
+**The 101 enhanced parts + 51 blogs are the primary data to build the agent system against.** The enhanced parts have everything needed for all 5 tools. The blogs add ~86,000 words of brand-specific error code guides, troubleshooting articles, and how-to content that dramatically improves RAG quality — especially for queries our structured data doesn't cover (e.g., "Bosch dishwasher E22 error", "how to reset my Whirlpool dishwasher"). The remaining 4,069 parts can be enhanced later by re-running the scraper with more Firecrawl credits or from a machine with a non-blocked IP.
 
 ---
 
@@ -24,6 +24,7 @@ All files are in the `data/` directory.
 | `parts_by_ps.json` | ~3.3 MB | Same data keyed by PS number for O(1) lookup. Used by `get_product_details` and `check_compatibility`. |
 | `parts.csv` | ~729 KB | Flat CSV export of key fields for quick inspection in a spreadsheet. |
 | `repairs.json` | ~16 KB | 20 repair/troubleshooting guides (10 fully enhanced, 10 baseline-only). |
+| `blogs.json` | ~1 MB | **51 blog posts** (30 refrigerator + 21 dishwasher). ~86,000 words of error codes, how-tos, troubleshooting, and maintenance content. High-value RAG source. |
 | `models_index.json` | ~varies | Model number -> list of compatible PS numbers. **1,500 models** mapped. Used by `check_compatibility`. |
 | `symptoms_index.json` | ~52 KB | `appliance_type:symptom` -> list of PS numbers. **48 symptom mappings**. Used by `diagnose_symptom`. |
 | `scrape_stats.json` | ~321 B | Data quality metrics snapshot. |
@@ -301,6 +302,154 @@ These repair page URLs returned "Page Not Found" from Firecrawl (anti-bot protec
 
 ---
 
+## Blog Data (51 articles)
+
+Scraped via `scrape_blogs.py`. Source URLs from `data/github-dta/partselect_blogs.csv` (215 total blogs, filtered to 51 relevant fridge/dishwasher articles). **100% success rate** — blog pages have no anti-bot protection.
+
+### Why Blogs Matter for RAG
+
+The blogs fill critical gaps that neither product pages nor repair guides cover:
+
+1. **Brand-specific error codes** — Users search for "Bosch E22 error" or "Samsung 22E code", not "dishwasher not draining". These 11 error code blogs are the only data source that handles these queries.
+2. **Brand-specific how-tos** — "How to reset my Whirlpool dishwasher" is a common query. The repair guides are brand-agnostic; the blogs are brand-specific.
+3. **Maintenance content** — "How to clean dishwasher filter", "smelly fridge" — practical queries that don't map to any specific part or symptom.
+4. **Deeper troubleshooting** — The "Refrigerator Not Cooling" blog (1,584 words) covers compressor testing with a multimeter, relay diagnostics, inverter drive compressors — far more depth than the repair guide (which was blocked by anti-bot anyway).
+
+### Schema
+
+```json
+{
+  "title": "Bosch Dishwasher E22 Error Code",
+  "url": "https://www.partselect.com/blog/bosch-dishwasher-e22-error-code/",
+  "appliance_type": "dishwasher",
+  "content_type": "error_code",
+  "headings": ["How to Quickly Fix the Bosch Dishwasher E22 Error", "Blocked Bosch Dishwasher Filter", ...],
+  "word_count": 1265,
+  "video_urls": [],
+  "part_category_links": [{"name": "replace the filter assembly", "url": "https://www.partselect.com/Dishwasher-Filters.htm"}],
+  "ps_numbers": [],
+  "brands_mentioned": ["Bosch"],
+  "step_count": 22,
+  "raw_markdown": "... up to 12,000 chars for RAG embedding ..."
+}
+```
+
+### Content Breakdown
+
+| Content Type | Count | Avg Words | Description |
+|---|---|---|---|
+| `how_to` | 19 | 1,532 | Step-by-step repair/maintenance instructions |
+| `error_code` | 11 | 1,813 | Brand-specific error code diagnosis and fixes |
+| `general` | 9 | 1,894 | Symptom-based articles (leaking, compressor hot, no power) |
+| `troubleshooting` | 7 | 2,112 | Deep diagnostic guides (longest content) |
+| `tips` | 3 | 1,076 | Energy saving, food storage, dishwasher loading |
+| `maintenance` | 2 | 1,236 | Cleaning guides (freezer, smelly fridge) |
+| **Total** | **51** | **1,698** | **86,587 words total** |
+
+### By Appliance
+
+| Appliance | Count |
+|---|---|
+| Refrigerator | 30 |
+| Dishwasher | 21 |
+
+### Brands Covered
+
+Bosch, Frigidaire, GE, LG, Samsung, Whirlpool — the 6 most popular brands. Our enhanced product pages are mostly Whirlpool/Admiral; the blogs add critical coverage for Bosch, Samsung, LG, and Frigidaire.
+
+### All 51 Blog Articles
+
+#### Error Code Guides (11)
+
+| Title | Appliance | Brands | Words |
+|---|---|---|---|
+| Bosch Dishwasher E22 Error Code | Dishwasher | Bosch | 1,265 |
+| Bosch Dishwasher E15 Error Code | Dishwasher | Bosch | 1,643 |
+| Bosch Dishwasher E24 Error Code | Dishwasher | Bosch | 2,103 |
+| What Does Samsung Dishwasher Blinking Heavy Mean | Dishwasher | Samsung | 2,836 |
+| Whirlpool Dishwasher F2 Error Code | Dishwasher | Whirlpool | 2,024 |
+| LG Dishwasher AE Error Code | Dishwasher | LG | 2,015 |
+| Samsung Fridge Error Code 41 | Refrigerator | Samsung | 903 |
+| Samsung Refrigerator 22E Error Code | Refrigerator | Samsung | 1,252 |
+| GE Refrigerator TF TC Code | Refrigerator | GE | 1,172 |
+| Frigidaire Refrigerator Sy Ef Error Code | Refrigerator | Frigidaire | 2,048 |
+| Frigidaire Refrigerator H1 Hi Error Code | Refrigerator | Frigidaire | 2,686 |
+
+#### How-To Guides (19)
+
+| Title | Appliance | Words |
+|---|---|---|
+| How To Clean A Bosch Dishwasher | Dishwasher | 1,943 |
+| How To Fix Frigidaire Dishwasher Not Draining | Dishwasher | 3,015 |
+| How To Clean Whirlpool Dishwasher Filter | Dishwasher | 1,869 |
+| How To Remove Dishwasher | Dishwasher | 1,335 |
+| How To Reset A Whirlpool Dishwasher Guide | Dishwasher | 806 |
+| How To Reset GE Dishwasher | Dishwasher | 1,154 |
+| How To Load Your Dishwasher | Dishwasher | 1,467 |
+| Fix Dishwasher That Won't Start | Dishwasher | 1,658 |
+| Fix Noisy Dishwasher | Dishwasher | 864 |
+| How To Reset A Frigidaire Refrigerator | Refrigerator | 821 |
+| How To Use Power Cool On A Samsung Fridge | Refrigerator | 2,053 |
+| How To Reset A GE Profile Ice Maker | Refrigerator | 1,298 |
+| How To Fix A Torn Refrigerator Door Seal | Refrigerator | 1,333 |
+| How To Replace LG Refrigerator Water Filter | Refrigerator | 1,282 |
+| Repair Or Replace Refrigerator Shelf | Refrigerator | 1,838 |
+| How To Put A Lock On A Refrigerator | Refrigerator | 1,175 |
+| Fix Broken Refrigerator Ice Maker | Refrigerator | 2,081 |
+| How To Fix Frigidaire Freezer Not Freezing | Refrigerator | 2,418 |
+| How To Fix Fridge That Is Too Warm | Refrigerator | 699 |
+
+#### Troubleshooting (7)
+
+| Title | Appliance | Words |
+|---|---|---|
+| Why Dishwasher Stops Mid Cycle | Dishwasher | 3,126 |
+| Bosch Ice Maker Not Working | Refrigerator | 2,966 |
+| Samsung Ice Maker Not Working | Refrigerator | 2,836 |
+| Ice Maker Troubleshooting | Refrigerator | 1,496 |
+| Refrigerator Not Cooling | Refrigerator | 1,584 |
+| Fridge Frost Buildup Troubleshoot | Refrigerator | 1,869 |
+| Why Is My Fridge Noisy | Refrigerator | 909 |
+
+#### General / Symptom-Based (9)
+
+| Title | Appliance | Words |
+|---|---|---|
+| GE Dishwasher Leaking From Bottom | Dishwasher | 2,686 |
+| Bosch Dishwasher Not Starting And Red Light | Dishwasher | 1,844 |
+| GE Dishwasher No Power No Lights | Dishwasher | 1,707 |
+| Dishwasher Stopping Mid Cycle | Dishwasher | 554 |
+| Refrigerator Compressor Getting Hot | Refrigerator | 2,432 |
+| Refrigerator Tripping Breaker | Refrigerator | 3,341 |
+| Refrigerator Humming Noise | Refrigerator | 1,919 |
+| Preparing Your Fridge For A Gathering | Refrigerator | 1,359 |
+| Fridge Freezing Food | Refrigerator | 1,202 |
+
+#### Maintenance (2)
+
+| Title | Appliance | Words |
+|---|---|---|
+| Clean Chest Freezer | Refrigerator | 1,042 |
+| Cleaning A Smelly Fridge | Refrigerator | 1,431 |
+
+#### Tips (3)
+
+| Title | Appliance | Words |
+|---|---|---|
+| Fridge Energy Saving Tips | Refrigerator | 1,238 |
+| Proper Fridge Food Storage | Refrigerator | 1,018 |
+| Dishwasher Safe Items | Dishwasher | 972 |
+
+### Part Category Links in Blogs
+
+The blogs link to **103 unique part category pages** on PartSelect (e.g., "replacement drain pump" -> `/Dishwasher-Pumps.htm`). These can be used to connect blog content to specific parts in our database at query time.
+
+### Videos in Blogs
+
+**39 YouTube videos** found across the 51 blogs. These are embedded tutorial videos — distinct from the install videos in the product data.
+
+---
+
 ## Models Index
 
 `models_index.json` maps **1,500 model numbers** to their compatible parts.
@@ -339,18 +488,18 @@ This powers the `diagnose_symptom` tool's ability to recommend specific parts fo
 
 | Tool | Required Data | Status |
 |---|---|---|
-| `search_parts` | name, description, symptoms, raw_markdown (for RAG embedding) | Works fully for 101 enhanced parts (semantic search). Works partially for 4,069 baseline parts (keyword match on name/symptoms only). |
+| `search_parts` | name, description, symptoms, raw_markdown (for RAG embedding) | Works fully for 101 enhanced parts (semantic search). Works partially for 4,069 baseline parts (keyword match on name/symptoms only). **51 blog articles add 86K words of searchable content for symptom/error code queries.** |
 | `check_compatibility` | compatible_models list | Works for **96 parts** across **1,500 models**. Returns "unknown" for the 4,069 baseline parts. |
 | `get_product_details` | all fields for product card UI | Full product card (image, rating, price, description) for 101 enhanced parts. Basic card (name, price, brand) for baseline. |
-| `get_installation_guide` | difficulty, time, steps, video | Difficulty/time from CSV covers 1,760 parts. Step-by-step instructions only from 10 enhanced repair guides. |
-| `diagnose_symptom` | symptom->cause->part mapping | 10 enhanced guides with structured causes (41 causes total). Symptom->part mapping from CSV covers 1,460 parts. |
+| `get_installation_guide` | difficulty, time, steps, video | Difficulty/time from CSV covers 1,760 parts. Step-by-step instructions from 10 enhanced repair guides + **19 how-to blog articles with detailed steps**. |
+| `diagnose_symptom` | symptom->cause->part mapping | 10 enhanced guides with structured causes (41 causes total). Symptom->part mapping from CSV covers 1,460 parts. **11 error code blogs + 7 troubleshooting blogs add brand-specific diagnostic content (Bosch E22/E15/E24, Samsung 22E/41, Whirlpool F2, etc.).** |
 
 ---
 
 ## Recommended Build Strategy
 
 ### Phase 1: Build with enhanced data (now)
-Build and test all 5 tools against the **87 fully-complete parts**. These parts span both appliance types, have all fields, and cover enough variety (filters, gaskets, motors, switches, thermostats, spray arms, etc.) to demonstrate every tool capability.
+Build and test all 5 tools against the **87 fully-complete parts** + **51 blog articles** + **10 enhanced repair guides**. These span both appliance types, have all fields, and cover enough variety to demonstrate every tool capability.
 
 **Benchmark queries to test with:**
 - "Find a water inlet valve for my refrigerator" -> should return PS11752778 and similar
@@ -358,15 +507,28 @@ Build and test all 5 tools against the **87 fully-complete parts**. These parts 
 - "My dishwasher won't drain" -> should trigger diagnose_symptom, return 6 causes
 - "How do I install PS10065979?" -> should return difficulty, video
 - "Show me details for PS2121513" -> should return full product card with image, rating, 4.7 stars
+- "Bosch dishwasher E22 error" -> should return blog content with step-by-step fix (filter, drain hose, drain pump)
+- "How to reset my Whirlpool dishwasher" -> should return blog content with reset instructions
+- "Samsung ice maker not working" -> should return blog content with 7+ diagnostic steps
+- "My fridge is making a humming noise" -> should return blog + repair guide content
 
 ### Phase 2: Embed for RAG (next)
-The 101 enhanced parts each have ~8,000 chars of `raw_markdown` plus structured fields. Chunk and embed these into ChromaDB using Gemini Embedding 2. The 10 enhanced repair guides also have raw_markdown for embedding.
+Three content sources to chunk and embed into ChromaDB using Gemini Embedding 2:
+
+| Source | Documents | Avg Size | Chunk Strategy |
+|---|---|---|---|
+| 101 enhanced product pages | 101 | ~8,000 chars | Entity-centric: overview, compatibility, installation, troubleshooting chunks per part |
+| 10 enhanced repair guides | 10 | ~8,000 chars | Split by cause section (H2/H3), each chunk = one cause with its steps |
+| 51 blog articles | 51 | ~10,000 chars | Split by H2 section, each chunk = one topic/fix. Tag with `content_type` and `brands_mentioned` metadata |
+
+The blogs are especially valuable because they should be chunked by section (each H2 is a self-contained fix/topic), tagged with brand metadata, and given high retrieval priority for error code queries.
 
 ### Phase 3: Extend coverage (later)
 Options to enhance more parts:
-1. **Re-run scraper** with `--max-products 150` (uses ~200 more credits, ~124 remaining)
+1. **Re-run scraper** with `--max-products 150` (uses ~200 more credits, ~70 remaining)
 2. **Buy Hobby plan** ($16/mo, 3,000 credits) to scrape 1,000+ parts
 3. **Direct scraping** from a non-blocked IP (free, unlimited, 1.5s/page)
+4. **Scrape remaining 164 non-fridge/dishwasher blogs** for tier-2 fallback content (other appliances)
 
 ---
 
@@ -390,9 +552,13 @@ uv run python scrape_partselect.py all --max-products 50
 
 # Test with 1 page (recon)
 uv run python scrape_partselect.py recon
+
+# Scrape blog posts (separate script)
+uv run python scrape_blogs.py              # scrape all relevant blogs
+uv run python scrape_blogs.py --dry-run    # preview without scraping
 ```
 
-The scraper saves checkpoints every 25 parts and supports resume — if interrupted, re-running the same command picks up where it left off.
+Both scrapers save checkpoints and support resume — if interrupted, re-running the same command picks up where it left off.
 
 **Environment:** Requires `FIRECRAWL_API_KEY` in `.env` file (loaded via python-dotenv).
 
@@ -407,9 +573,11 @@ The scraper saves checkpoints every 25 parts and supports resume — if interrup
 | Product scraping (101 pages) | 101 |
 | Repair guide scraping (20 pages) | 20 |
 | Retry blocked repairs (10 pages) | 10 |
+| Blog scraping (51 pages) | 51 |
+| Blog samples (3 test pages) | 3 |
 | Overhead / misc | ~4 |
-| **Total used** | **~176** |
-| **Remaining** | **324** |
+| **Total used** | **~230** |
+| **Remaining** | **270** |
 
 ---
 
@@ -424,3 +592,7 @@ The scraper saves checkpoints every 25 parts and supports resume — if interrup
 4. **No `recommended_parts` in repair guides** — Repair pages link to part *categories* (e.g., "Refrigerator Valves") not individual PS numbers. To connect causes to specific parts, we'll need to match cause part names against our parts database at query time.
 
 5. **Stale baseline data** — The 4,069 non-enhanced parts have prices and stock status from ~1 year ago. These are fine for search/discovery but shouldn't be shown as current pricing.
+
+6. **Blogs link to categories, not parts** — Like the repair guides, blog articles link to part category pages (`/Dishwasher-Filters.htm`) rather than specific PS numbers. The agent will need to bridge from category names to specific parts at query time using the parts database.
+
+7. **Blog source CSV** — The 215 blog URLs came from `data/github-dta/partselect_blogs.csv` (a third-party CSV found online). The other two CSVs from the same source (`all_parts.csv` and `all_repairs.csv`) are byte-identical to our `reference_parts.csv` and `reference_repairs.csv` — no new data.
