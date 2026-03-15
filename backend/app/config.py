@@ -22,7 +22,6 @@ DATA_DIR = PROJECT_ROOT / "data"
 CHROMA_DIR = PROJECT_ROOT / "backend" / "chroma_db"
 
 # Data files
-PARTS_JSON = DATA_DIR / "parts.json"
 PARTS_BY_PS_JSON = DATA_DIR / "parts_by_ps.json"
 MODELS_INDEX_JSON = DATA_DIR / "models_index.json"
 SYMPTOMS_INDEX_JSON = DATA_DIR / "symptoms_index.json"
