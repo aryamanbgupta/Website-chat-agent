@@ -4,7 +4,14 @@ from google import genai
 
 from app.config import EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, GEMINI_API_KEY
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+_client = None
+
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=GEMINI_API_KEY)
+    return _client
 
 
 def embed_texts(
@@ -20,7 +27,7 @@ def embed_texts(
     Returns:
         List of embedding vectors (768 dims).
     """
-    result = client.models.embed_content(
+    result = _get_client().models.embed_content(
         model=EMBEDDING_MODEL,
         contents=texts,
         config={

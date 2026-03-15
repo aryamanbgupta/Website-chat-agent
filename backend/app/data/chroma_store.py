@@ -1,5 +1,7 @@
 """ChromaDB client and collection management."""
 
+from __future__ import annotations
+
 import chromadb
 
 from app.config import CHROMA_DIR

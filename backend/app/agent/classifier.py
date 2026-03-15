@@ -81,18 +81,21 @@ def classify(message: str) -> Intent:
     has_model = bool(MODEL_NUMBER_PATTERN.search(text))
     has_ps = bool(re.search(r"PS\d{5,10}", text, re.IGNORECASE))
 
+    # Other appliance check — must come BEFORE repair keyword check
+    # so "fix my washing machine" → other_appliance, not on_topic
+    has_other_appliance = bool(OTHER_APPLIANCE_KEYWORDS.search(text))
+    if has_other_appliance and not has_appliance and not has_part and not has_ps:
+        return Intent.OTHER_APPLIANCE
+
     if has_appliance or has_part or has_ps or has_model:
         return Intent.ON_TOPIC
 
     if has_repair:
         return Intent.ON_TOPIC
 
-    # Other appliance check
-    if OTHER_APPLIANCE_KEYWORDS.search(text):
-        return Intent.OTHER_APPLIANCE
-
     # Short follow-up messages in a conversation context should be on-topic
-    if len(text.split()) <= 5:
+    # (e.g. "yes", "that one", "how much?")
+    if len(text.split()) <= 4:
         return Intent.ON_TOPIC
 
     return Intent.OFF_TOPIC

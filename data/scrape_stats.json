@@ -1,17 +1,17 @@
 {
   "total_parts": 4170,
-  "enhanced_via_firecrawl": 101,
+  "enhanced_via_firecrawl": 4170,
   "with_price": 4170,
-  "with_compatible_models": 96,
-  "with_rating": 88,
-  "with_description": 97,
-  "with_image": 101,
+  "with_compatible_models": 3814,
+  "with_rating": 2041,
+  "with_description": 2442,
+  "with_image": 3630,
   "with_video": 1971,
-  "with_symptoms": 1460,
-  "with_difficulty": 1760,
+  "with_symptoms": 1591,
+  "with_difficulty": 1802,
   "by_appliance": {
-    "refrigerator": 2629,
-    "dishwasher": 1541
+    "dishwasher": 1541,
+    "refrigerator": 2629
   },
-  "avg_models_per_enhanced_part": 29.729166666666668
+  "avg_models_per_enhanced_part": 428.6261143156791
 }

@@ -11,7 +11,14 @@ from app.agent.system_prompt import SYSTEM_PROMPT
 from app.config import GEMINI_API_KEY, GEMINI_MODEL, MAX_AGENT_ITERATIONS
 from app.tools.registry import execute_tool, get_tool_declarations
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+_client = None
+
+
+def _get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=GEMINI_API_KEY)
+    return _client
 
 
 async def run_agent(
@@ -59,7 +66,7 @@ async def run_agent(
         iterations += 1
 
         try:
-            response = client.models.generate_content(
+            response = _get_client().models.generate_content(
                 model=GEMINI_MODEL,
                 contents=gemini_contents,
                 config=types.GenerateContentConfig(
@@ -111,7 +118,8 @@ async def run_agent(
             result = execute_tool(tool_name, tool_args)
 
             # Emit structured events for specific tool results
-            yield from _emit_structured_events(tool_name, result)
+            for evt in _emit_structured_events(tool_name, result):
+                yield evt
 
             tool_results.append(types.Part(function_response=types.FunctionResponse(
                 name=tool_name,
