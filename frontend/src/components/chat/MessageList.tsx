@@ -33,7 +33,6 @@ export function MessageList() {
           key={msg.id}
           message={msg}
           statusText={msg === lastAssistant && isStreaming ? statusText : null}
-          onFollowUp={sendMessage}
         />
       ))}
 

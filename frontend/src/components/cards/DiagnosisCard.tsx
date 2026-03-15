@@ -7,7 +7,6 @@ import { StockBadge } from "@/components/shared/StockBadge";
 
 interface DiagnosisCardProps {
   data: DiagnosisData;
-  onFollowUp?: (question: string) => void;
 }
 
 function LikelihoodIndicator({ likelihood }: { likelihood: string }) {
@@ -54,7 +53,7 @@ function CauseItem({ cause }: { cause: DiagnosisCause }) {
   );
 }
 
-export function DiagnosisCard({ data, onFollowUp }: DiagnosisCardProps) {
+export function DiagnosisCard({ data }: DiagnosisCardProps) {
   return (
     <div className="border border-border bg-white my-2 overflow-hidden animate-fade-in">
       <div className="bg-teal-light px-3 py-2 border-b border-border">
@@ -131,20 +130,19 @@ export function DiagnosisCard({ data, onFollowUp }: DiagnosisCardProps) {
         {data.follow_up_questions && data.follow_up_questions.length > 0 && (
           <div>
             <p className="text-xs font-medium text-muted-text uppercase tracking-wide mb-1.5">
-              Follow-up Questions
+              To help diagnose further, please answer:
             </p>
-            <div className="flex flex-col gap-1">
+            <ul className="flex flex-col gap-1">
               {data.follow_up_questions.map((q, i) => (
-                <button
+                <li
                   key={i}
-                  onClick={() => onFollowUp?.(q)}
-                  className="flex items-center gap-1.5 text-left text-xs text-primary-teal hover:text-teal-dark hover:bg-teal-light px-2 py-1.5 transition-colors"
+                  className="flex items-start gap-1.5 text-xs text-body-text px-2 py-1"
                 >
-                  <ChevronRight size={12} className="flex-shrink-0" />
+                  <ChevronRight size={12} className="flex-shrink-0 mt-0.5 text-primary-teal" />
                   <span>{q}</span>
-                </button>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         )}
       </div>

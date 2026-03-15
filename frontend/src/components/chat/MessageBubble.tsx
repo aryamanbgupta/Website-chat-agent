@@ -11,15 +11,23 @@ import { StreamingIndicator } from "./StreamingIndicator";
 interface MessageBubbleProps {
   message: Message;
   statusText?: string | null;
-  onFollowUp?: (question: string) => void;
 }
 
 export function MessageBubble({
   message,
   statusText,
-  onFollowUp,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
+
+  // Render text blocks first, then structured cards below
+  const textBlocks = message.content.filter((b) => b.type === "text");
+  const cardBlocks = message.content.filter(
+    (b) =>
+      b.type === "product_card" ||
+      b.type === "compatibility_result" ||
+      b.type === "diagnosis"
+  );
+  const orderedBlocks = [...textBlocks, ...cardBlocks];
 
   return (
     <div
@@ -32,7 +40,7 @@ export function MessageBubble({
             : "bg-white"
         }`}
       >
-        {message.content.map((block, i) => {
+        {orderedBlocks.map((block, i) => {
           switch (block.type) {
             case "text":
               return isUser ? (
@@ -52,15 +60,7 @@ export function MessageBubble({
             case "compatibility_result":
               return <CompatibilityBadge key={i} data={block.data} />;
             case "diagnosis":
-              return (
-                <DiagnosisCard
-                  key={i}
-                  data={block.data}
-                  onFollowUp={onFollowUp}
-                />
-              );
-            case "status":
-              return null;
+              return <DiagnosisCard key={i} data={block.data} />;
             default:
               return null;
           }
