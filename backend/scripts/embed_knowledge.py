@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.config import BLOGS_JSON, REPAIRS_JSON
+from app.config import BLOGS_JSON, REPAIRS_ALL_JSON
 from app.data.chroma_store import get_knowledge_collection
 from app.data.embeddings import embed_texts
 
@@ -22,22 +22,33 @@ BATCH_SIZE = 50
 
 
 def build_repair_chunks(repairs: list[dict]) -> tuple[list[str], list[str], list[dict]]:
-    """Split repair guides into overview + per-cause chunks."""
+    """Split repair guides into overview + per-cause chunks.
+
+    Handles 3 guide types: generic, brand_specific, and howto.
+    For howto guides, uses title/action instead of symptom for the overview.
+    """
     ids = []
     documents = []
     metadatas = []
 
-    for repair in repairs:
+    for repair_idx, repair in enumerate(repairs):
+        guide_type = repair.get("guide_type", "generic")
         symptom = repair.get("symptom", "")
         appliance = repair.get("appliance_type", "")
         description = repair.get("description", "")
         title = repair.get("title", symptom)
+        action = repair.get("action", "")
 
-        if not symptom:
+        # For howto guides, use title as the identifier (no symptom field)
+        # Include index to guarantee uniqueness across guides with same identifier
+        identifier = f"{repair_idx}:{symptom or action or title}"
+        if not (symptom or action or title):
             continue
 
         # Overview doc
         overview_parts = [f"Repair Guide: {title}"]
+        if action:
+            overview_parts.append(f"Action: {action}")
         if description:
             overview_parts.append(description)
         if repair.get("difficulty"):
@@ -53,7 +64,7 @@ def build_repair_chunks(repairs: list[dict]) -> tuple[list[str], list[str], list
 
         overview_text = "\n".join(overview_parts)
         if len(overview_text.strip()) > 20:
-            doc_id = f"repair:{appliance}:{symptom}:overview"
+            doc_id = f"repair:{guide_type}:{appliance}:{identifier}:overview"
             ids.append(doc_id)
             documents.append(overview_text)
             metadatas.append({
@@ -61,6 +72,7 @@ def build_repair_chunks(repairs: list[dict]) -> tuple[list[str], list[str], list
                 "appliance_type": appliance,
                 "content_type": "overview",
                 "symptom": symptom,
+                "guide_type": guide_type,
                 "chunk_type": "repair_guide",
             })
 
@@ -78,7 +90,7 @@ def build_repair_chunks(repairs: list[dict]) -> tuple[list[str], list[str], list
                 f"{cause_desc}"
             )
 
-            doc_id = f"repair:{appliance}:{symptom}:{cause_name}"
+            doc_id = f"repair:{guide_type}:{appliance}:{identifier}:{cause_name}"
             ids.append(doc_id)
             documents.append(cause_text)
             metadatas.append({
@@ -87,6 +99,7 @@ def build_repair_chunks(repairs: list[dict]) -> tuple[list[str], list[str], list
                 "content_type": "cause",
                 "symptom": symptom,
                 "cause_name": cause_name,
+                "guide_type": guide_type,
                 "chunk_type": "repair_guide",
             })
 
@@ -171,10 +184,24 @@ def _split_by_h2(markdown: str, title: str) -> list[tuple[str, str]]:
 
 
 def main():
-    # Load data
-    print("Loading repair guides...")
-    with open(REPAIRS_JSON) as f:
-        repairs = json.load(f)
+    # Load data — flatten all 3 sub-lists, filter out "Page Not Found" brand guides
+    print("Loading repair guides from repairs_all.json...")
+    with open(REPAIRS_ALL_JSON) as f:
+        repairs_all = json.load(f)
+
+    repairs = []
+    for guide in repairs_all.get("generic_symptom_guides", []):
+        guide["guide_type"] = "generic"
+        repairs.append(guide)
+    for guide in repairs_all.get("brand_specific_guides", []):
+        if guide.get("title", "").strip() == "Page Not Found":
+            continue
+        guide["guide_type"] = "brand_specific"
+        repairs.append(guide)
+    for guide in repairs_all.get("howto_guides", []):
+        guide["guide_type"] = "howto"
+        repairs.append(guide)
+    print(f"  {len(repairs)} guides after filtering")
 
     print("Loading blog articles...")
     with open(BLOGS_JSON) as f:

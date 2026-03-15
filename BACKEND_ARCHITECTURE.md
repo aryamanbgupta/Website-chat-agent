@@ -2,7 +2,7 @@
 
 ## Context
 
-We're building the FastAPI backend for a PartSelect.com AI chat agent (InstaLILY case study). The backend orchestrates a Gemini 2.5 Flash agent that uses tool-calling to answer questions about refrigerator and dishwasher parts. We have 4,170 parts (101 enhanced with full data, 4,069 baseline), 10 enhanced repair guides, 51 blog articles (86K words), 1,500 model mappings, and 48 symptom mappings ready to go.
+We're building the FastAPI backend for a PartSelect.com AI chat agent (InstaLILY case study). The backend orchestrates a Gemini 2.5 Flash agent that uses tool-calling to answer questions about refrigerator and dishwasher parts. We have 4,170 parts (2,442 enhanced with full data, 1,728 baseline), 149 repair guides (22 generic + 91 brand-specific + 36 how-to), 51 blog articles (86K words), 162,976 model mappings, and 49 symptom mappings ready to go.
 
 ---
 
@@ -52,23 +52,26 @@ This parameter is **not used by tool logic** — it's for chain-of-thought (impr
 ### `check_compatibility(reasoning, part_number, model_number)`
 - Normalize inputs → look up part in `parts_by_ps.json` → check `compatible_models` list
 - Also reverse-check `models_index.json`
-- Return `confidence: "verified"` when found, `"not_in_data"` when not (never say "incompatible" — we only have ~30 models per part due to scraping limits)
+- Return `confidence: "verified"` when found, `"not_in_data"` when not (never say "incompatible" — we have 162,976 models but coverage varies per part, avg 429 models/part)
 - When not in data: honest caveat + link to PartSelect.com for the full compatibility list
 - Returns: compatible (bool/null), part info, confidence, message, source_url
 
 ### `get_installation_guide(reasoning, part_number?, symptom?, appliance_type?)`
 - Part-based: look up difficulty, time, video from `parts_by_ps.json`
-- Symptom-based: look up repair guide from `repairs.json` for step-by-step instructions
+- Symptom-based: look up repair guide from all 149 guides for step-by-step instructions
+- Matches against `symptom`, `title`, and `action` fields (brand-specific/how-to guides)
 - Cross-reference: match part names against repair guide causes for richer results
 - Returns: difficulty, time, video_url, steps[], tips, related_guide
 
 ### `diagnose_symptom(reasoning, symptom, appliance_type, model_number?)`
-- Fuzzy-match symptom against 48 keys in `symptoms_index.json`
-- Look up structured causes from enhanced repair guides in `repairs.json`
+- Fuzzy-match symptom against 49 keys in `symptoms_index.json`
+- Look up structured causes from all 149 repair guides (generic, brand-specific, how-to)
+- Matches against `symptom`, `title`, and `action` fields — brand-specific guides use `title` since their `symptom` field may contain the brand name
 - **Also search `knowledge` collection** for relevant blog content (error codes, brand-specific troubleshooting). This is critical for queries like "Bosch E22 error" or "Samsung ice maker not working" that the repair guides don't cover.
+- Includes `source_url` in cause results for linking to full repair pages
 - Link cause names to actual purchasable parts via name matching against parts DB
 - If model_number provided, filter parts to compatible ones
-- Returns: matched symptom, causes with recommended parts, knowledge_snippets[], follow_up_questions
+- Returns: matched symptom, causes with recommended parts + source_url, knowledge_snippets[], follow_up_questions
 
 ### `get_product_details(reasoning, part_number)`
 - Direct lookup in `parts_by_ps.json`
@@ -89,14 +92,16 @@ $36.18, 4.9 stars (351 reviews). In stock.
 This refrigerator door bin is a genuine OEM replacement...
 Fixes symptoms: Door won't close, Ice or frost buildup, Leaking.
 ```
-- **101 enhanced**: full doc with description, symptoms, all metadata
-- **4,069 baseline**: shorter doc from name + brand + symptoms (if available) + price
+- **2,442 enhanced**: full doc with description, symptoms, all metadata
+- **1,728 baseline**: shorter doc from name + brand + symptoms (if available) + price
 - **Why not raw_markdown?** Navigation noise, image URLs, diagram references dilute embedding quality. Entity-centric docs are ~300-500 tokens — no chunking needed. One part = one vector.
 
-**Source 2: Repair Guides (10 enhanced)** — Split by cause
+**Source 2: Repair Guides (149 total)** — Split by cause
+- 22 generic + 91 brand-specific (10 "Page Not Found" filtered out) + 36 how-to guides
 - Each guide → 1 overview doc + 1 doc per structured cause (with description + steps)
-- ~51 vectors total (10 overviews + 41 causes)
-- Metadata: `appliance_type`, `symptom`, `cause_name`, `chunk_type=repair_guide`
+- ~689 vectors total (overviews + per-cause chunks)
+- For how-to guides: uses `title` and `action` fields in overview (no `symptom` field)
+- Metadata: `appliance_type`, `symptom`, `cause_name`, `guide_type` (generic/brand_specific/howto), `chunk_type=repair_guide`
 
 **Source 3: Blog Articles (51)** — Split by H2 section
 - These are the highest-value RAG addition: 86K words covering error codes, brand-specific how-tos, maintenance, and deep troubleshooting
@@ -105,20 +110,20 @@ Fixes symptoms: Door won't close, Ice or frost buildup, Leaking.
 - Metadata: `appliance_type`, `content_type` (error_code/how_to/troubleshooting/etc.), `brands_mentioned[]`, `chunk_type=blog`
 - **Critical for**: "Bosch E22 error", "how to reset Whirlpool dishwasher", "Samsung ice maker not working" — queries our parts/repair data can't answer
 
-### Embedding model: Gemini Embedding 2
+### Embedding model: Gemini Embedding (gemini-embedding-001)
 
-- Best text retrieval scores (MTEB #1) + `task_type` parameter (RETRIEVAL_QUERY vs RETRIEVAL_DOCUMENT) = free accuracy boost
+- Stable GA model with `task_type` parameter (RETRIEVAL_QUERY vs RETRIEVAL_DOCUMENT) = free accuracy boost
+- 768 dimensions (Matryoshka truncation)
 - Gemma 2 requires self-hosting on a GPU (Railway doesn't have GPUs) — not worth deployment complexity
-- `text-embedding-004` is cheaper but at our scale the total cost difference is < $1
-- If we add image upload later, Gemini Embedding 2 handles it with zero migration
+- If we add image upload later, Gemini Embedding handles it with zero migration
 
 ### ChromaDB setup:
-- **Two collections**: `parts` (4,170 vectors) and `knowledge` (~250 vectors from guides + blogs)
+- **Two collections**: `parts` (4,170 vectors) and `knowledge` (~937 vectors from guides + blogs)
 - Separate collections because search behavior differs: part search returns purchasable items, knowledge search returns informational content. The agent may query both or just one depending on the query type.
-- 768 dimensions (Gemini Embedding 2 with Matryoshka truncation)
+- 768 dimensions (Gemini Embedding with Matryoshka truncation)
 - Parts metadata: `ps_number`, `appliance_type`, `brand`, `data_tier`, `has_description`
-- Knowledge metadata: `source_type` (repair_guide/blog), `appliance_type`, `content_type`, `brands_mentioned`, `symptom`
-- Total: ~4,420 vectors
+- Knowledge metadata: `source_type` (repair_guide/blog), `appliance_type`, `content_type`, `guide_type`, `brands_mentioned`, `symptom`
+- Total: ~5,107 vectors
 
 ### Keyword fallback:
 - Simple in-memory inverted index of part name words → PS numbers
@@ -289,7 +294,8 @@ backend/
 
   scripts/
     embed_parts.py             # One-time: embed all 4,170 parts into ChromaDB `parts` collection
-    embed_knowledge.py         # One-time: embed repair guides + blogs into ChromaDB `knowledge` collection
+    embed_knowledge.py         # One-time: embed 149 repair guides + 51 blogs into ChromaDB `knowledge` collection
+    test_backend.py            # Smoke tests: data loading, tool correctness, app imports (15 tests)
 
   pyproject.toml
   .env
@@ -323,7 +329,7 @@ Build the data foundation first so tools are built directly against ChromaDB fro
 3. `data/embeddings.py` — Gemini Embedding 2 wrapper (task_type support, 768 dims)
 4. `data/chroma_store.py` — ChromaDB client, two collections (`parts` + `knowledge`), query interface
 5. `scripts/embed_parts.py` — Embed all 4,170 parts (entity-centric docs) into `parts` collection
-6. `scripts/embed_knowledge.py` — Embed 10 repair guides (split by cause) + 51 blogs (split by H2) into `knowledge` collection
+6. `scripts/embed_knowledge.py` — Embed 149 repair guides (split by cause, 3 guide types) + 51 blogs (split by H2) into `knowledge` collection
 7. `data/search.py` — Hybrid search: regex detection → JSON lookup / ChromaDB vector / keyword fallback + RRF merge. Queries can target `parts`, `knowledge`, or both.
 8. **Verify**: run test queries against both collections — part searches, error code queries, symptom queries
 
@@ -373,15 +379,25 @@ Test against these benchmark queries:
 
 Run each query and verify: correct tool called, correct data returned, reasoning parameter logged, streamed response includes product cards, text is accurate.
 
+### Automated Smoke Tests
+
+```bash
+uv run python -m scripts.test_backend
+```
+
+Runs 15 tests covering: data loader counts, guide type filtering, "Page Not Found" exclusion, symptom diagnosis (generic + brand-specific), how-to guide matching, part search, compatibility checks, product details, and app imports.
+
 ---
 
 ## Key Data Files
 
 | File | Description |
 |---|---|
-| `data/parts_by_ps.json` | 4,170 parts keyed by PS number (primary lookup store) |
-| `data/parts.json` | 4,170 parts as array (for embedding iteration) |
-| `data/models_index.json` | 1,500 model → parts mappings |
-| `data/symptoms_index.json` | 48 symptom → parts mappings |
-| `data/repairs.json` | 20 repair guides (10 enhanced with structured causes + steps) |
+| `data/parts_by_ps.json` | 4,170 parts keyed by PS number (primary lookup store, ~68 MB) |
+| `data/models_index.json` | 162,976 model → parts mappings (~25 MB) |
+| `data/symptoms_index.json` | 49 symptom → parts mappings |
+| `data/repairs.json` | 22 generic symptom repair guides (backward compatible) |
+| `data/repairs_all.json` | All 159 repair guides: 22 generic + 101 brand-specific + 36 how-to (~1.1 MB) |
 | `data/blogs.json` | 51 blog articles (86K words: error codes, how-tos, troubleshooting, maintenance) |
+
+**Note:** `parts.json` (array format, ~68 MB) is NOT loaded at runtime to save memory. The loader uses only `parts_by_ps.json` for O(1) lookups. The `embed_parts.py` script reads `parts_by_ps.json` directly.

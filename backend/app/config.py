@@ -9,8 +9,8 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # Model config
-GEMINI_MODEL = "gemini-2.5-flash-preview-05-20"
-EMBEDDING_MODEL = "gemini-embedding-exp-03-07"
+GEMINI_MODEL = "gemini-2.5-flash"
+EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 
 # Agent config
@@ -27,6 +27,7 @@ PARTS_BY_PS_JSON = DATA_DIR / "parts_by_ps.json"
 MODELS_INDEX_JSON = DATA_DIR / "models_index.json"
 SYMPTOMS_INDEX_JSON = DATA_DIR / "symptoms_index.json"
 REPAIRS_JSON = DATA_DIR / "repairs.json"
+REPAIRS_ALL_JSON = DATA_DIR / "repairs_all.json"
 BLOGS_JSON = DATA_DIR / "blogs.json"
 
 # Search config

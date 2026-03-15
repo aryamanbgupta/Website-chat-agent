@@ -47,5 +47,6 @@ async def health():
         parts_loaded=len(loader.parts_by_ps),
         models_loaded=len(loader.models_index),
         repairs_loaded=len(loader.repairs),
+        total_repairs_loaded=len(loader.all_repairs),
         blogs_loaded=len(loader.blogs),
     )

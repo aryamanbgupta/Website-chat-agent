@@ -18,4 +18,5 @@ class HealthResponse(BaseModel):
     parts_loaded: int = 0
     models_loaded: int = 0
     repairs_loaded: int = 0
+    total_repairs_loaded: int = 0
     blogs_loaded: int = 0

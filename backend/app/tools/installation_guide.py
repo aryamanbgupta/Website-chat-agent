@@ -44,7 +44,7 @@ def get_installation_guide(
             # Cross-reference: find repair guides that mention this part's name
             part_name = part.get("name", "").lower()
             part_appliance = part.get("appliance_type", appliance_type or "")
-            for repair in loader.repairs:
+            for repair in loader.all_repairs:
                 if repair.get("appliance_type", "") != part_appliance:
                     continue
                 # Check if any cause name appears in the part name
@@ -75,28 +75,51 @@ def get_installation_guide(
 
 
 def _find_repair_guide(symptom: str, appliance_type: str | None) -> dict | None:
-    """Find a repair guide matching the symptom."""
+    """Find a repair guide matching the symptom.
+
+    Searches all 149+ guides including brand-specific and how-to guides.
+    For how-to guides, also matches against the action and title fields.
+    """
     symptom_lower = symptom.lower().strip()
     best_match = None
     best_score = 0
 
-    for repair in loader.repairs:
+    for repair in loader.all_repairs:
         if appliance_type and repair.get("appliance_type", "") != appliance_type:
             continue
 
         repair_symptom = repair.get("symptom", "").lower()
 
-        # Exact match
+        # Exact match on symptom
         if symptom_lower == repair_symptom:
             return _format_repair_guide(repair)
 
-        # Fuzzy: check word overlap
+        # Word overlap scoring across symptom, title, and action fields
         symptom_words = set(symptom_lower.split())
+
         repair_words = set(repair_symptom.split())
         overlap = len(symptom_words & repair_words)
 
-        if overlap > best_score:
-            best_score = overlap
+        # Also check title (brand-specific guides)
+        title_lower = repair.get("title", "").lower()
+        title_words = set(title_lower.split()) - {"how", "to", "fix", "a", "the"}
+        title_overlap = len(symptom_words & title_words)
+        if symptom_lower in title_lower:
+            title_overlap += 2
+
+        # Also check action field (howto guides)
+        action_lower = repair.get("action", "").lower()
+        action_overlap = 0
+        if action_lower:
+            action_words = set(action_lower.split())
+            action_overlap = len(symptom_words & action_words)
+            if symptom_lower in action_lower or action_lower in symptom_lower:
+                action_overlap += 2
+
+        best_field_score = max(overlap, title_overlap, action_overlap)
+
+        if best_field_score > best_score:
+            best_score = best_field_score
             best_match = repair
 
     if best_match and best_score >= 1:
