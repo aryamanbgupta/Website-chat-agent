@@ -15,14 +15,14 @@ import type {
 import { generateId } from "@/lib/utils";
 import { API_PATHS } from "@/lib/constants";
 
-const initialState: ChatState = {
+export const initialState: ChatState = {
   messages: [],
   isStreaming: false,
   error: null,
   statusText: null,
 };
 
-function chatReducer(state: ChatState, action: ChatAction): ChatState {
+export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case "ADD_USER_MESSAGE":
       return {
