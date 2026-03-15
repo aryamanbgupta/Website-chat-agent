@@ -20,7 +20,7 @@ frontend/.next/
 frontend/.vercel/
 
 # Vector DB (regenerated via embed scripts)
-backend/chroma_db/
+# backend/chroma_db/ — committed for deployment (pre-built vector indexes)
 
 # OS
 .DS_Store
