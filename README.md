@@ -15,11 +15,11 @@ An AI-powered parts assistant for PartSelect.com that uses a **custom agent loop
 ![51 Blog Articles](https://img.shields.io/badge/Blog_Articles-51-blue)
 
 <p align="center">
-  <img src="docs/screenshots/hero-conversation.png" alt="PartSelect AI Chat Agent — multi-turn conversation showing diagnosis and product recommendations" width="800" />
+  <img src="docs/screenshots/hero-conversation-1.png" alt="PartSelect AI Chat Agent — multi-turn conversation showing diagnosis and product recommendations" width="800" />
 </p>
 
 <p align="center">
-  <a href="https://website-chat-agent.vercel.app/"><strong>Live Demo</strong></a> · <a href="<!-- TODO: Loom URL -->"><strong>Video Walkthrough</strong></a>
+  <a href="https://website-chat-agent.vercel.app/"><strong>Live Demo</strong></a> · <a href="docs/PartSelect_AI_Agent_v2.pdf"><strong>Presentation (PDF)</strong></a>
 </p>
 
 ---
@@ -50,7 +50,7 @@ An AI-powered parts assistant for PartSelect.com that uses a **custom agent loop
 <strong>Product Card</strong><br/>Price, rating, stock, difficulty, symptom tags
 </td>
 <td align="center" width="33%">
-<img src="docs/screenshots/diagnosis-card.png" alt="Diagnosis card" width="280" /><br/>
+<img src="docs/screenshots/diagnosis-card-1.png" alt="Diagnosis card" width="280" /><br/>
 <strong>Diagnosis Card</strong><br/>Ranked causes with recommended parts
 </td>
 </tr>
@@ -64,7 +64,7 @@ An AI-powered parts assistant for PartSelect.com that uses a **custom agent loop
 <strong>Voice Input</strong><br/>Mic button for hands-free queries
 </td>
 <td align="center" width="33%">
-<img src="docs/screenshots/guardrail.png" alt="Guardrail redirect" width="280" /><br/>
+<img src="docs/screenshots/guardrails.png" alt="Guardrail redirect" width="280" /><br/>
 <strong>Scope Guardrail</strong><br/>Polite redirect for off-topic queries
 </td>
 </tr>
@@ -366,6 +366,7 @@ The agent stays scoped to refrigerators and dishwashers through three independen
 
 | Document | Description |
 |---|---|
+| [Presentation (PDF)](docs/PartSelect_AI_Agent_v2.pdf) | 18-slide deck covering interface design, architecture, extensibility, and query accuracy |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Full system architecture — agent loop, LLM choice, data pipeline, guardrails, extensibility |
 | [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md) | Backend implementation — tools, embedding strategy, search, streaming, session management |
 | [DATA_STATUS.md](DATA_STATUS.md) | Data pipeline status — scraper details, coverage metrics, schema definitions |
@@ -374,24 +375,3 @@ The agent stays scoped to refrigerators and dishwashers through three independen
 ---
 
 <p align="center">Built by <a href="https://github.com/aryamanbgupta">Aryaman Gupta</a> as a case study for <strong>Instalily AI</strong>.</p>
-
-<!--
-=== SCREENSHOT CAPTURE CHECKLIST ===
-
-Create the directory: mkdir -p docs/screenshots
-
-Capture these 7 screenshots and place them in docs/screenshots/:
-
-| File                      | What to Capture |
-|---------------------------|-----------------|
-| hero-conversation.png     | Full chat showing: user asks about ice maker → DiagnosisCard with causes → ProductCard recommendations → follow-up question. Should span 3+ messages. |
-| starter-prompts.png       | Welcome screen with the 4 starter prompt buttons (Ice maker, Find part, Check compatibility, Dishwasher drain) |
-| product-card.png          | A single ProductCard in conversation — show one with image, price, star rating, stock badge, difficulty, and "Fixes: ..." symptom tags |
-| diagnosis-card.png        | A DiagnosisCard showing possible causes with likelihood indicators + recommended parts with thumbnails and prices |
-| compatibility-badge.png   | A compatibility check result showing the green "Compatible" verified badge with part/model numbers |
-| voice-input.png           | The chat input area with the mic button in active/pulsing state |
-| guardrail.png             | The off-topic redirect message (e.g., user asked about washing machine → polite redirect) |
-
-Recommended: 800px wide, 2x resolution (retina), PNG format.
-After capturing, remove this comment block.
--->
