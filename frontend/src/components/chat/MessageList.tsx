@@ -8,7 +8,7 @@ import { QuickReplyButtons } from "./QuickReplyButtons";
 
 export function MessageList() {
   const { messages, isStreaming, statusText, sendMessage } = useChatContext();
-  const { containerRef, handleScroll } = useAutoScroll([messages, statusText]);
+  const { containerRef, handleScroll } = useAutoScroll([messages, statusText], isStreaming);
 
   if (messages.length === 0) {
     return (

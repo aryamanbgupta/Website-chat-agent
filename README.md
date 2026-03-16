@@ -16,6 +16,7 @@ An AI-powered parts assistant for PartSelect.com that uses a **custom agent loop
 
 <p align="center">
   <img src="docs/screenshots/hero-conversation-1.png" alt="PartSelect AI Chat Agent — multi-turn conversation showing diagnosis and product recommendations" width="800" />
+  <img src="docs/screenshots/hero-conversation-2.png" alt="PartSelect AI Chat Agent — product cards, compatibility check, and follow-up suggestions" width="800" />
 </p>
 
 <p align="center">
@@ -152,7 +153,7 @@ The backend runs a **custom while-loop agent** — the LLM receives the user mes
 │  │  - part_number          │  │                              │ │
 │  └─────────────────────────┘  └──────────────────────────────┘ │
 │                                                                 │
-│  Embeddings: Gemini text-embedding-004                          │
+│  Embeddings: Gemini Embedding (gemini-embedding-001)             │
 │  768 dimensions via Matryoshka Representation Learning          │
 └─────────────────────────────────────────────────────────────────┘
 ```
